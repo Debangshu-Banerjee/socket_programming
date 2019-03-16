@@ -15,6 +15,8 @@
 #define ADMIN 2
 #define NO_USER -1
 #define INTERNAL_ERROR -2
+#define EXIT -3
+#define SUCCESS 3
 
 // header start
 char* Msg_From_Client(int sock_fd);
@@ -23,10 +25,13 @@ void handling_client(int client_fd);
 void close_socket_from_server_side(int client_fd);
 int is_terminate_msg(char * msg_from_client);
 int authenticate_user(char* username,char* password);
+int checkUser(char *username);
 void close_socket_for_internal_error(int client_fd);
 void requests_of_user(char* username,char* password,int client_fd);
 char* get_available_balance(char* username);
 char* get_mini_stat(char* username);
+void update_user_balance(char *username,int transaction,double balance);
+int Client_Query(char *username, int client_fd);
 
 // header finish----------
 
@@ -86,7 +91,7 @@ void close_socket_from_server_side(int client_fd){
 		printf("%d  closed gracefully\n",client_fd);
 }
 
-int authenticte_user(char* username,char* password){
+int authenticate_user(char* username,char* password){
 	char * line = NULL;
     size_t len = 0;
     ssize_t read;
@@ -140,6 +145,37 @@ int authenticte_user(char* username,char* password){
 	return NO_USER;
 }
 
+int checkUser(char *user)
+{
+	FILE *fp=fopen("user_login","r");
+	char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+	while((read = getline(&line, &len, fp)) != -1) 
+	{
+		char *token=strtok(line," ");
+
+		if(token == NULL){fclose(fp); printf(" problem in opening user_login file entries\n"); return 0;}
+
+		if(strcmp(token,user)==0)
+		{
+			token=strtok(NULL," ");
+			token=strtok(NULL," ");
+			if(token[0]=='C')
+			{
+				fclose(fp);
+				return 1;
+			}
+        }
+    }
+
+    fclose(fp);
+    return 0;
+
+
+}
+
 
 // helper function for sending msg to server
 void Msg_To_Client(int sock_fd,char* str_to_send){
@@ -165,8 +201,111 @@ char* get_mini_stat(char* username){
 
 }
 
+void update_user_balance(char *username,int transaction,double balance)
+{
+	FILE *fp=fopen(username,"r");
+	char * line = NULL;
+	char c=(transaction == 1)?'C':'D';
+	char *line1=(char *)malloc(sizeof(char)*10000);
+    size_t len = 0;
+    ssize_t read;
+	time_t ltime; /* calendar time */
+
+	ltime=time(NULL); /* get current cal time */
+	sprintf(line1,"%.*s %c %f\n",(int)strlen(asctime(localtime(&ltime)))-1,asctime(localtime(&ltime)),c,balance);
+
+	while((read = getline(&line, &len, fp)) != -1)
+		strcat(line1,line);
+
+	fclose(fp);
+	fp=fopen(username,"w");
+	fwrite(line1, sizeof(char), strlen(line1), fp);
+	fclose(fp);
+}
+
+int Client_Query(char *username, int client_fd)
+{
+	Msg_To_Client(client_fd,"You are logged in as user.\n
+			1) Type `Credit` to credit balance to an account.\n
+			2) Type `Debit` to debit balance from an account.\n
+			3) Type `Terminate` to quit\n");
+	int query_flag = -1;
+	char* msg_from_client = NULL;
+	while(1){
+		msg_from_client = Msg_From_Client(client_fd);
+		if(msg_from_client == NULL){
+			return EXIT;
+		}
+		else if(strncmp(msg_from_client,"Terminate",9)== 0){
+			return EXIT;
+		}
+		else if(strncmp(msg_from_client,"Credit",6)== 0) {
+			query_flag = 1;
+		}
+		else if(strncmp(msg_from_client,"Debit",5)== 0){
+			query_flag = 2;
+		}
+		else{
+			query_flag = -1;
+		}
+
+		free(msg_from_client);
+		double balance=strtod(get_available_balance(username),NULL);
+
+		switch(query_flag) {
+			case 1:
+				Msg_To_Client(client_fd, "Enter Amount to be credited");
+				while(1){	
+					msg_from_client = Msg_From_Client(client_fd);
+					double amount = strtod(msg_from_client, NULL);
+
+					if(amount<=0){
+						Msg_To_Client(client_fd, "Enter valid amount");
+					}
+					else {
+						balance += amount;
+						update_user_balance(username, query_flag, balance);
+						Msg_To_Client(client_fd, "Credit successful\n
+						1) Type username of account holder to perform transactions.\n
+	    				2) Type `Terminate` to quit\n");
+	    				return SUCCESS;
+					}
+				}
+			case 2:
+				Msg_To_Client(client_fd, "Enter Amount to be debited");
+				while(1){	
+					msg_from_client = Msg_From_Client(client_fd);
+					double amount = strtod(msg_from_client, NULL);
+
+					if(amount<=0){
+						Msg_To_Client(client_fd, "Enter valid amount");
+					}
+					else if(amount > balance) {
+						Msg_To_Client(client_fd, "Insufficient Balance!\n Enter valid amount to debit");
+					}
+					else {
+						balance -= amount;
+						update_user_balance(username, query_flag, balance);
+						Msg_To_Client(client_fd, "Debit successful\n
+						1) Type username of account holder to perform transactions.\n
+	    				2) Type `Terminate` to quit\n");
+	    				return SUCCESS;
+					}
+				}
+			default:
+				Msg_To_Client(client_fd, "Unknown Query\n
+					1) Type `Credit` to credit balance to an account.\n
+					2) Type `Debit` to debit balance from an account.\n
+					3) Type `Terminate` to quit\n");
+		}
+	}
+}
+
 void requests_of_user(char* username,char* password,int client_fd){
-		Msg_To_Client(client_fd,"You are logged in as user.\n1) Type `Request: Bal` to see available balance of your account.\n2) Type `Request: Mini_stat` to see mini statement of your account.\n3) Type `Terminate` to quit\n");
+		Msg_To_Client(client_fd,"You are logged in as user.\n
+			1) Type `Request: Bal` to see available balance of your account.\n
+			2) Type `Request: Mini_stat` to see mini statement of your account.\n
+			3) Type `Terminate` to quit\n");
 		int user_flag = -1;
 		char* msg_from_client = NULL;
 		while(1){
@@ -217,13 +356,112 @@ void requests_of_user(char* username,char* password,int client_fd){
 }
 
 void requests_of_admin(){
+	Msg_To_Client(client_fd,"You are logged in as admin.\n
+			1) Type username of account holder to perform transactions.\n
+    		2) Type `Terminate` to quit\n");
+
+	while(1)
+	{
+		char *msg_from_client = NULL;
+		msg_from_client = Msg_From_Client(client_fd);
+
+		if(msg_from_client == NULL) {
+			break;
+		}
+		else if(strncmp(msg_from_client,"Terminate",9)== 0) {
+			break;
+		}
+		else if(checkUser(msg_from_client))
+		{
+			char *username=(char *)malloc(40*sizeof(char));
+			strcpy(username,msg_from_client);
+
+			int query_result = Client_Query(username, client_fd);
+
+			if(query_result == EXIT)
+				break;
+		}
+		else
+			Msg_To_Client(client_fd,"Wrong Username. Please enter a valid user");
+	}
 
 
 }
 
-void requests_of_police(){
+void requests_of_police(int client_fd){
+	Msg_To_Client(client_fd,"You are logged in as police.\n
+			1) Type `Request: Bal` to see balance of all users.\n
+ 		    2) Type `Request: Mini_stat` to see mini statement of an account.\n
+    		3) Type `Terminate` to quit\n");
+	int police_flag = -1;
+	char* msg_from_client = NULL;
+	while(1)
+	{
+		msg_from_client = Msg_From_Client(client_fd);
 
+		if(msg_from_client == NULL){
+			police_flag = 0;
+			break;
+		}
+		else if(strncmp(msg_from_client,"Terminate",9)== 0){
+			police_flag = 0;
+			break;
+		}
+		else if(strncmp(msg_from_client,"Request: Bal",12)== 0) {
+			police_flag = 1;
+		}
+		else if(strncmp(msg_from_client,"Request: Mini_stat",18)== 0){
+			police_flag = 2;
+		}
+		else{
+			police_flag = -1;
+		}
 
+		free(msg_from_client);
+
+		char* out_bal = (char*) malloc(1000*sizeof(char));
+		char* out_mini_stat = (char*)malloc(10000*sizeof(char));
+
+		switch(police_flag){
+			case 1:
+				strcpy(out_bal,getBalanceAll());
+				Msg_To_Client(client_fd,strcat(out_bal,"\n======================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+				if(out_bal != NULL) free(out_bal);
+				break;
+			case 2:
+				Msg_To_Client(client_fd, "Enter UserName or Type `Terminate` to exit");
+				while(1) {
+					msg_from_client = Msg_From_Client(client_fd);
+					if(msg_from_client == NULL) {
+						police_flag = 0;
+						break;
+					}
+					else if(strncmp(msg_from_client,"Terminate",9)== 0) {
+						police_flag = 0;
+						break;
+					}
+					else if(checkUser(msg_from_client)) {
+						char *username=(char *)malloc(sizeof(char)*40);
+						strcpy(username,msg_from_client);
+				 		strcpy(out_mini_stat,get_mini_stat(username));
+						Msg_To_Client(client_fd,strcat(out_mini_stat,"\n====================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+						if(out_mini_stat != NULL) free(out_mini_stat);
+						break;
+					}
+				}
+				break;
+			default:
+				Msg_To_Client(client_fd, "Unknown Query.\n	
+						1) Type `Request: Bal` to see balance of all users.\n
+			 		    2) Type `Request: Mini_stat` to see mini statement of an account.\n
+    					3) Type `Terminate` to quit\n");
+				break;
+		}
+		if(police_flag == 0) {
+			break;
+		}
+	}
+	close_socket_from_server_side(client_fd);
 }
 
 
@@ -280,7 +518,7 @@ void handling_client(int client_fd){
        		password[i] = '\0';
        		free(msg_from_client);
 
-       		authorisation = authenticte_user(username,password);
+       		authorisation = authenticate_user(username,password);
        		printf("%d authorisation\n",authorisation );
        		try = 1;
        		if(authorisation == NO_USER){
