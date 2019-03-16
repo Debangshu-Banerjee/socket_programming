@@ -11,8 +11,28 @@
 
 char* Msg_From_Server(int sock_fd);
 void Msg_To_Server(int sock_fd,char* str_to_send);
+void close_socket_from_client(int sock_fd);
+void close_socket_due_to_internal_error(int sock_fd);
 
+void close_socket_from_client(int sock_fd){
+	Msg_To_Server(sock_fd,"Terminate");
+	shutdown(sock_fd, SHUT_WR);
+	char *msg_from_server;
+	while(1) {
+        msg_from_server = Msg_From_Server(sock_fd);
+        if(msg_from_server == NULL)
+            break;
+        free(msg_from_server);
+    }
+    shutdown(sock_fd, SHUT_RD);
+   	close(sock_fd);
+}
 
+void close_socket_due_to_internal_error(int sock_fd){
+		shutdown(sock_fd, SHUT_RD);
+		shutdown(sock_fd, SHUT_WR);
+		close(sock_fd);
+}
 
 // helper function to receive msg from server
 char* Msg_From_Server(int sock_fd) {
@@ -56,8 +76,8 @@ int main(int argc,char** argv){
 	struct sockaddr_in serv_addr;
 
 	  
-	char *msg_From_Server;
-    char msg_To_Server[512];
+	char *msg_from_server;
+    char msg_to_server[512];
 	
 
 	sock_fd=socket(AF_INET, SOCK_STREAM, 0);
@@ -68,22 +88,33 @@ int main(int argc,char** argv){
     serv_addr.sin_port = htons(port_no);     //setting server port number passed as an argument
     if(!(inet_aton(argv[1], &serv_addr.sin_addr)))   printf("server address is not valid\n"); // setting server host name passed as an argument
   
-     if(connect(sock_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
+    if(connect(sock_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
      	printf("can not connect to the server\n");
      	return -1;
-     }
-     else{
-     	printf("connection established\n login to avail the functionalities\n");
-     }
+    }
+    else{
+     	printf("connection established\nlogin to avail the functionalities\n");
+    }
 
-     while(1){
-     	scanf("%s",msg_To_Server);
-     	Msg_To_Server(sock_fd,msg_To_Server);
-     	msg_From_Server = Msg_From_Server(sock_fd);
-     	printf("%s\n", msg_From_Server);
-     	if(strcmp(msg_To_Server,"terminate") == 0) break;
-     }
-     close(sock_fd);
+    while(1){
+     	 msg_from_server = Msg_From_Server(sock_fd);
 
+     	if(msg_from_server == NULL){
+     		close_socket_due_to_internal_error(sock_fd);
+     		break;
+     	}
+     	printf("%s",msg_from_server);
+		if(strncmp(msg_from_server, "INTERNAL_ERROR", 14 ) == 0){
+			close_socket_due_to_internal_error(sock_fd);
+			break;
+		}
+		scanf("%s",msg_to_server);     	
+		if(strncmp(msg_to_server,"Terminate",9) == 0){
+			close_socket_from_client(sock_fd);
+			break;
+		}
+		Msg_To_Server(sock_fd,msg_to_server);
 
+    }
+    return 0;
 }
