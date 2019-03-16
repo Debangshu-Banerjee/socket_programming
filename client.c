@@ -39,7 +39,6 @@ char* Msg_From_Server(int sock_fd) {
     int num_pkts_currently_received = 0;
     int n = read(sock_fd, &num_pkts_currently_received, sizeof(int));
     if(n <= 0) {
-        shutdown(sock_fd, SHUT_WR); /* needs attention*/
         return NULL;
     }
     char *str = (char*)malloc(num_pkts_currently_received*INPUT_MSG_SIZE);

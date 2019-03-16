@@ -24,6 +24,9 @@ void close_socket_from_server_side(int client_fd);
 int is_terminate_msg(char * msg_from_client);
 int authenticate_user(char* username,char* password);
 void close_socket_for_internal_error(int client_fd);
+void requests_of_user(char* username,char* password,int client_fd);
+char* get_available_balance(char* username);
+char* get_mini_stat(char* username);
 
 // header finish----------
 
@@ -153,16 +156,90 @@ void Msg_To_Client(int sock_fd,char* str_to_send){
 	}
 }
 
+char* get_available_balance(char* username){
+
+}
+
+char* get_mini_stat(char* username){
+
+
+}
+
+void requests_of_user(char* username,char* password,int client_fd){
+		Msg_To_Client(client_fd,"You are logged in as user.\n1) Type `Request: Bal` to see available balance of your account.\n2) Type `Request: Mini_stat` to see mini statement of your account.\n3) Type `Terminate` to quit\n");
+		int user_flag = -1;
+		char* msg_from_client = NULL;
+		while(1){
+			msg_from_client = Msg_From_Client(client_fd);
+			if(msg_from_client == NULL){
+				user_flag = 0;
+				break;
+			}
+			else if(strncmp(msg_from_client,"Terminate",9)== 0){
+				user_flag = 0;
+				break;
+			}
+			else if(strncmp(msg_from_client,"Request: Bal",12)== 0) {
+				user_flag = 1;
+			}
+			else if(strncmp(msg_from_client,"Request: Mini_stat",18)== 0){
+				user_flag = 2;
+			}
+			else{
+				user_flag = -1;
+			}
+
+
+			if(msg_from_client != NULL) free(msg_from_client);
+			char* out_bal= (char*) malloc(1000*sizeof(char));
+			char* out_mini_stat = (char*)malloc(10000*sizeof(char));
+			
+			switch(user_flag){
+				case 1:
+					strcpy(out_bal,get_available_balance(username));
+					Msg_To_Client(client_fd,strcat(out_bal,"\n======================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+					if(out_bal != NULL) free(out_bal);
+					break;
+				case 2:
+			 		strcpy(out_mini_stat,get_mini_stat(username));
+					Msg_To_Client(client_fd,strcat(out_mini_stat,"\n====================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+					if(out_mini_stat != NULL) free(out_mini_stat);
+					break;
+				default:
+					Msg_To_Client(client_fd, "Unknown Query.\n1) Type `Request: Bal` to see available balance of your account.\n2) Type `Request: Mini_stat` to see mini statement of your account.\n3) Type `Terminate` to quit\n");
+					break;
+			}
+		}
+
+		close_socket_from_server_side(client_fd);
+
+
+}
+
+void requests_of_admin(){
+
+
+}
+
+void requests_of_police(){
+
+
+}
+
+
+
+
+
+
 // also closes the ongoing connection gracefully
 void handling_client(int client_fd){
 		
 	   int authorisation = NO_USER;
 	   int try =0;
-	   while(1){
-       		char* username;
-       		char* password;
-       		char* msg_from_client;
-       		
+	   char* username;
+       char* password;
+       char* msg_from_client;
+	   while(1){       		
        		if(try){
        			msg_from_client = Msg_From_Client(client_fd);
        			if(is_terminate_msg(msg_from_client)){
@@ -208,9 +285,13 @@ void handling_client(int client_fd){
        		try = 1;
        		if(authorisation == NO_USER){
        			Msg_To_Client(client_fd,"Unathorised Login.Type Terminate to terminate or any key to try again.\n");
+       			if(username != NULL) free(username);
+       			if(password != NULL) free(password);
        		}
        		else if(authorisation == INTERNAL_ERROR){
        			close_socket_for_internal_error(client_fd);
+       			if(username != NULL) free(username);
+       			if(password != NULL) free(password);
        			return;
        		}
        		else{
@@ -219,16 +300,15 @@ void handling_client(int client_fd){
        	}	
        	switch(authorisation){
 			case USER:
-				Msg_To_Client(client_fd,"logged in as user\n");
-			    close_socket_for_internal_error(client_fd);
+			    requests_of_user(username,password,client_fd);
 				break;
 			case ADMIN:
 				Msg_To_Client(client_fd,"logged in as admin\n");
-			    close_socket_for_internal_error(client_fd);
+			    requests_of_admin();
 				break;	
 			case POLICE:
 			    Msg_To_Client(client_fd,"logged in as police\n");
-			    close_socket_for_internal_error(client_fd);
+			    requests_of_police();
 				break;	
 			default:
 				close_socket_for_internal_error(client_fd);
