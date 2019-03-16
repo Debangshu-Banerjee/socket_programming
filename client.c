@@ -26,12 +26,14 @@ void close_socket_from_client(int sock_fd){
     }
     shutdown(sock_fd, SHUT_RD);
    	close(sock_fd);
+   	printf("closed socket gracefully\n");
 }
 
 void close_socket_due_to_internal_error(int sock_fd){
 		shutdown(sock_fd, SHUT_RD);
 		shutdown(sock_fd, SHUT_WR);
 		close(sock_fd);
+		printf("closed socket gracefully\n");
 }
 
 // helper function to receive msg from server
@@ -96,8 +98,8 @@ int main(int argc,char** argv){
     }
 
     while(1){
-     	 msg_from_server = Msg_From_Server(sock_fd);
 
+     	msg_from_server = Msg_From_Server(sock_fd);
      	if(msg_from_server == NULL){
      		close_socket_due_to_internal_error(sock_fd);
      		break;
@@ -107,7 +109,14 @@ int main(int argc,char** argv){
 			close_socket_due_to_internal_error(sock_fd);
 			break;
 		}
-		scanf("%s",msg_to_server);     	
+		scanf("%s",msg_to_server);
+		if(strncmp(msg_to_server,"Request:",8) == 0){
+			strcat(msg_to_server," ");
+			char temp[400];
+			scanf("%s",temp);
+			strcat(msg_to_server,temp);
+
+		}    	
 		if(strncmp(msg_to_server,"Terminate",9) == 0){
 			close_socket_from_client(sock_fd);
 			break;

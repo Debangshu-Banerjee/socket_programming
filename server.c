@@ -15,6 +15,7 @@
 #define ADMIN 2
 #define NO_USER -1
 #define INTERNAL_ERROR -2
+#define lines_to_print_in_mini_stat 8
 
 // header start
 char* Msg_From_Client(int sock_fd);
@@ -157,11 +158,66 @@ void Msg_To_Client(int sock_fd,char* str_to_send){
 }
 
 char* get_available_balance(char* username){
+	FILE * fp = fopen(username,"r");
+	char* line = NULL;
+	size_t len = 0;
+    ssize_t read;
+    if(fp == NULL){
+    	char *available_bal=(char *)malloc(100*sizeof(char));
+		strcpy(available_bal,"Could not find the file having your transaction history.\n");
+		return available_bal;
+	}
+    if((read = getline(&line, &len, fp)) != -1){
+    	char *token,*prevtoken;
+    	prevtoken=(char *)malloc(400*sizeof(char));
+    	token=strtok(line," \n");
+    	while(token!=NULL)
+    	{
+    		strcpy(prevtoken,token);
+    		token=strtok(NULL," \n");
+    	}
+    	fclose(fp);
+    	return prevtoken;
+    }
+    else{
+    	fclose(fp);
+    	char *available_bal=(char *)malloc(2*sizeof(char));
+    	available_bal[0]='0';
+    	available_bal[1]='\0';
+    	return available_bal;
+    }
 
 }
 
-char* get_mini_stat(char* username){
 
+
+char* get_mini_stat(char* username){
+	FILE * fp = fopen(username,"r");
+	char* mini_statement = (char*)malloc(10000*sizeof(char));
+	if(fp == NULL){
+		strcpy(mini_statement,"Could not find the file having your transaction history.\n");
+		return mini_statement;
+	}
+	 mini_statement[0] = '\0';
+
+	char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    int count_lines =0 ;
+
+    while(count_lines<lines_to_print_in_mini_stat && (read = getline(&line, &len, fp)) != -1){
+		strcat(mini_statement,line);
+		count_lines++;
+	}
+
+	fclose(fp);
+
+	if(strlen(mini_statement) == 0){
+		strcpy(mini_statement,"You have not participated in any transation yet.\n");		
+	}
+
+	return mini_statement;
 
 }
 
@@ -189,20 +245,23 @@ void requests_of_user(char* username,char* password,int client_fd){
 				user_flag = -1;
 			}
 
-
 			if(msg_from_client != NULL) free(msg_from_client);
 			char* out_bal= (char*) malloc(1000*sizeof(char));
 			char* out_mini_stat = (char*)malloc(10000*sizeof(char));
+
+			strcpy(out_bal,"\nResponse: Available Balance ===============================\n\n");
+			strcpy(out_mini_stat,"\nResponse: Mini Statement ===============================\n\n");
 			
 			switch(user_flag){
 				case 1:
-					strcpy(out_bal,get_available_balance(username));
-					Msg_To_Client(client_fd,strcat(out_bal,"\n======================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+					strcat(out_bal,get_available_balance(username));
+					printf("%s\n",out_bal);
+					Msg_To_Client(client_fd,strcat(out_bal,"\n ===============================================\n\nType your next Query or Type `Terminate` to quit.\n"));
 					if(out_bal != NULL) free(out_bal);
 					break;
 				case 2:
-			 		strcpy(out_mini_stat,get_mini_stat(username));
-					Msg_To_Client(client_fd,strcat(out_mini_stat,"\n====================================\n\nType your next Query or Type `Terminate` to quit.\n"));
+			 		strcat(out_mini_stat,get_mini_stat(username));
+					Msg_To_Client(client_fd,strcat(out_mini_stat,"\n=============================================\n\nType your next Query or Type `Terminate` to quit.\n"));
 					if(out_mini_stat != NULL) free(out_mini_stat);
 					break;
 				default:
