@@ -20,8 +20,10 @@ void close_socket_from_client(int sock_fd){
 	char *msg_from_server;
 	while(1) {
         msg_from_server = Msg_From_Server(sock_fd);
+
         if(msg_from_server == NULL)
             break;
+        printf("%s\n", );
         free(msg_from_server);
     }
     shutdown(sock_fd, SHUT_RD);
