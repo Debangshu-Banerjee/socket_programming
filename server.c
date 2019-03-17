@@ -655,6 +655,10 @@ int main(int argc, char **argv){
 
 	int sock_fd,client_fd,port_no;
 	struct sockaddr_in serv_addr, cli_addr;
+	if(argc < 2){
+		printf("Input the desired port no \n");
+		return -1;
+	}
 
 	memset((void*)&serv_addr, 0, sizeof(serv_addr));
 	port_no=atoi(argv[1]);

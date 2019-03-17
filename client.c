@@ -23,7 +23,7 @@ void close_socket_from_client(int sock_fd){
 
         if(msg_from_server == NULL)
             break;
-        printf("%s\n", );
+        printf("%s\n",msg_from_server );
         free(msg_from_server);
     }
     shutdown(sock_fd, SHUT_RD);
@@ -77,8 +77,10 @@ int main(int argc,char** argv){
 
 	int sock_fd,port_no;
 	struct sockaddr_in serv_addr;
-
-	  
+	if(argc < 3){
+		printf("Input the server ip address and port no \n");
+		return -1;
+	}	  
 	char *msg_from_server;
     char msg_to_server[512];
 	
