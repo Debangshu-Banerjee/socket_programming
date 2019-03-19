@@ -14,6 +14,7 @@ void Msg_To_Server(int sock_fd,char* str_to_send);
 void close_socket_from_client(int sock_fd);
 void close_socket_due_to_internal_error(int sock_fd);
 
+// closed socket gracefully from the client side
 void close_socket_from_client(int sock_fd){
 	Msg_To_Server(sock_fd,"Terminate");
 	shutdown(sock_fd, SHUT_WR);
@@ -31,6 +32,7 @@ void close_socket_from_client(int sock_fd){
    	printf("closed socket gracefully\n");
 }
 
+// closed socket if the server facing some internal problems terminates the connection
 void close_socket_due_to_internal_error(int sock_fd){
 		shutdown(sock_fd, SHUT_RD);
 		shutdown(sock_fd, SHUT_WR);
@@ -113,14 +115,7 @@ int main(int argc,char** argv){
 			close_socket_due_to_internal_error(sock_fd);
 			break;
 		}
-		scanf("%s",msg_to_server);
-		if(strncmp(msg_to_server,"Request:",8) == 0){
-			strcat(msg_to_server," ");
-			char temp[400];
-			scanf("%s",temp);
-			strcat(msg_to_server,temp);
-
-		}    	
+		scanf("%s",msg_to_server);	
 		if(strncmp(msg_to_server,"Terminate",9) == 0){
 			close_socket_from_client(sock_fd);
 			break;

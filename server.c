@@ -20,14 +20,15 @@
 #define SUCCESS 3
 
 
-// header start
+// header start--------
+
 char* Msg_From_Client(int sock_fd);
 void Msg_To_Client(int sock_fd,char* str_to_send);
 void handling_client(int client_fd);
 void close_socket_from_server_side(int client_fd);
 int is_terminate_msg(char * msg_from_client);
 int authenticate_user(char* username,char* password);
-int checkUser(char *username);
+int check_user(char *username);
 void close_socket_for_internal_error(int client_fd);
 void requests_of_user(char* username,char* password,int client_fd);
 char* get_available_balance(char* username);
@@ -40,12 +41,11 @@ char* get_balance_all();
 
 // header finish----------
 
-// helper function to receive msg from server
+// helper function to receive msg from client
 char* Msg_From_Client(int sock_fd) {
     int num_pkts_currently_received = 0;
     int n = read(sock_fd, &num_pkts_currently_received, sizeof(int));
     if(n <= 0) {
-        //shutdown(sock_fd, SHUT_WR); /* needs attention*/
         return NULL;
     }
     char *str = (char*)malloc(num_pkts_currently_received*INPUT_MSG_SIZE);
@@ -59,6 +59,7 @@ char* Msg_From_Client(int sock_fd) {
     return str_p;
 }
 
+// check wheather the client is saying to terminate the connection or not
 int is_terminate_msg(char * msg_from_client){
 	if(msg_from_client == NULL){
 		return 1;
@@ -70,6 +71,8 @@ int is_terminate_msg(char * msg_from_client){
 		return 0;
 	}
 }
+
+// suffered an internal error and has to close the socket
 void close_socket_for_internal_error(int client_fd){
 		printf("An internal error occurred\n");
 		Msg_To_Client(client_fd,"INTERNAL_ERROR occurred. Try again later\n");
@@ -96,6 +99,7 @@ void close_socket_from_server_side(int client_fd){
 		printf("%d  closed gracefully\n",client_fd);
 }
 
+// if the username and password is correct returns the mode of client
 int authenticate_user(char* username,char* password){
 	char * line = NULL;
     size_t len = 0;
@@ -149,8 +153,8 @@ int authenticate_user(char* username,char* password){
     fclose(fp);
 	return NO_USER;
 }
-
-int checkUser(char *user)
+// check the username is a valid user mode holder or not
+int check_user(char *user)
 {
 	FILE *fp=fopen("user_login","r");
 	char * line = NULL;
@@ -182,7 +186,7 @@ int checkUser(char *user)
 }
 
 
-// helper function for sending msg to server
+// helper function for sending msg to client
 void Msg_To_Client(int sock_fd,char* str_to_send){
 	if(str_to_send == NULL) return;
 	int num_pkts_to_send_currently = 0;
@@ -197,6 +201,7 @@ void Msg_To_Client(int sock_fd,char* str_to_send){
 	}
 }
 
+// returns the currently available balance of the user called from user mode
 char* get_available_balance(char* username){
 	FILE * fp = fopen(username,"r");
 	char* line = NULL;
@@ -229,6 +234,7 @@ char* get_available_balance(char* username){
 
 }
 
+// get balance related information of all "users" called from police mode
 char * get_balance_all(){
 	FILE *fp=fopen("user_login","r");
 	char *retstr=(char *)malloc(3000*sizeof(char));
@@ -262,7 +268,7 @@ char * get_balance_all(){
 
     return retstr;
 }	
-
+// mini statement of a particular user prints at max 8 transaction histories
 char* get_mini_stat(char* username){
 	FILE * fp = fopen(username,"r");
 	char* mini_statement = (char*)malloc(10000*sizeof(char));
@@ -293,8 +299,8 @@ char* get_mini_stat(char* username){
 
 }
 
-void update_user_balance(char *username,int transaction,double balance)
-{
+// open the transaction history file and add the recent transaction at the top the file
+void update_user_balance(char *username,int transaction,double balance){
 	FILE *fp=fopen(username,"r");
 	char * line = NULL;
 	char c=(transaction == 1)?'C':'D';
@@ -315,8 +321,8 @@ void update_user_balance(char *username,int transaction,double balance)
 	fclose(fp);
 }
 
-int Client_Query(char *username, int client_fd)
-{
+// client query helps admin to either credit or debit from an account
+int Client_Query(char *username, int client_fd){
 	Msg_To_Client(client_fd,"\n1) Type `Credit` to credit balance to user account.\n2) Type `Debit` to debit balance from an account.\n3) Type `Terminate` to quit\n");
 	int query_flag = -1;
 	char* msg_from_client = NULL;
@@ -338,7 +344,7 @@ int Client_Query(char *username, int client_fd)
 			query_flag = -1;
 		}
 
-		free(msg_from_client);
+		if(msg_from_client!= NULL)free(msg_from_client);
 
 		char* temp = get_available_balance(username);
 		if(strncmp(temp,"Could",5) == 0){
@@ -392,7 +398,7 @@ int Client_Query(char *username, int client_fd)
 		}
 	}
 }
-
+// function handles requests of user mode
 void requests_of_user(char* username,char* password,int client_fd){
 		Msg_To_Client(client_fd,"You are logged in as user.\n1) Type `Balance` to see available balance of your account.\n2) Type `Mini_stat` to see mini statement of your account.\n3) Type `Terminate` to quit\n");
 		int user_flag = -1;
@@ -427,7 +433,6 @@ void requests_of_user(char* username,char* password,int client_fd){
 			switch(user_flag){
 				case 1:
 					strcat(out_bal,get_available_balance(username));
-					printf("%s\n",out_bal);
 					Msg_To_Client(client_fd,strcat(out_bal,"\n ===============================================\n\nType your next Query or Type `Terminate` to quit.\n"));
 					if(out_bal != NULL) free(out_bal);
 					break;
@@ -447,6 +452,7 @@ void requests_of_user(char* username,char* password,int client_fd){
 
 }
 
+// handling requests of the admin
 void requests_of_admin(int client_fd){
 	Msg_To_Client(client_fd,"You are logged in as admin.\n1) Type username of account holder to perform transactions.\n2) Type `Terminate` to quit\n");
 
@@ -461,7 +467,7 @@ void requests_of_admin(int client_fd){
 		else if(strncmp(msg_from_client,"Terminate",9)== 0) {
 			break;
 		}
-		else if(checkUser(msg_from_client))
+		else if(check_user(msg_from_client))
 		{
 			char *username=(char *)malloc(40*sizeof(char));
 			strcpy(username,msg_from_client);
@@ -482,7 +488,7 @@ void requests_of_admin(int client_fd){
 }
 
 void requests_of_police(int client_fd){
-	Msg_To_Client(client_fd,"You are logged in as police.\n1) Type `Balance_all` to see balance of all users.\n2) Type `Mini_stat` to see mini statement of an account.\n3) Type `Terminate` to quit\n");
+	Msg_To_Client(client_fd,"You are logged in as police.\n1) Type `Balance_all` to see available balance of all users.\n2) Type `Mini_stat` to see mini statement of an account.\n3) Type `Terminate` to quit\n");
 	int police_flag = -1;
 	char* msg_from_client = NULL;
 	while(1)
@@ -531,7 +537,7 @@ void requests_of_police(int client_fd){
 						police_flag = 0;
 						break;
 					}
-					else if(checkUser(msg_from_client)) {
+					else if(check_user(msg_from_client)) {
 						char *username=(char *)malloc(sizeof(char)*40);
 						strcpy(username,msg_from_client);
 						strcpy(out_mini_stat,"\nResponse: Mini Statement of ");
@@ -567,7 +573,7 @@ void requests_of_police(int client_fd){
 
 
 
-// also closes the ongoing connection gracefully
+// handle the client requests also closes the ongoing connection gracefully
 void handling_client(int client_fd){
 
 	   int authorisation = NO_USER;
@@ -598,7 +604,7 @@ void handling_client(int client_fd){
 	      		}
        		}
        		username[i] = '\0';
-       		free(msg_from_client);
+       		if(msg_from_client != NULL)free(msg_from_client);
 
        		Msg_To_Client(client_fd,"Enter password:\n");
        		msg_from_client = Msg_From_Client(client_fd);
@@ -614,10 +620,10 @@ void handling_client(int client_fd){
 	      		}
        		}
        		password[i] = '\0';
-       		free(msg_from_client);
+       		if(msg_from_client != NULL) free(msg_from_client);
 
        		authorisation = authenticate_user(username,password);
-       		printf("%d authorisation\n",authorisation );
+       		printf("new user logged in with authorisation %d\n",authorisation );
        		try = 1;
        		if(authorisation == NO_USER){
        			Msg_To_Client(client_fd,"Unathorised Login.Type Terminate to terminate or any key to try again.\n");
@@ -689,9 +695,10 @@ int main(int argc, char **argv){
 	        exit(EXIT_FAILURE);
 	    }
 
-	    switch(fork()) {
+	    switch(fork()){
 	        case -1:
-	            printf("Error in fork.\n"); // needs attention
+	            printf("Error in fork.\n");
+	            close_socket_for_internal_error(client_fd);
 	            break;
 	        case 0: {
 	            close(sock_fd);
@@ -701,7 +708,7 @@ int main(int argc, char **argv){
 	            break;
 	        }
 	        default:
-	            close(client_fd);
+	            //close_socket_for_internal_error(client_fd);
 	            break;
 	    }
 	}
