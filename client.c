@@ -17,18 +17,18 @@ void close_socket_due_to_internal_error(int sock_fd);
 // closed socket gracefully from the client side
 void close_socket_from_client(int sock_fd){
 	Msg_To_Server(sock_fd,"Terminate");
-	shutdown(sock_fd, SHUT_WR);
+	shutdown(sock_fd, SHUT_WR);   // stop writing 
 	char *msg_from_server;
 	while(1) {
-        msg_from_server = Msg_From_Server(sock_fd);
+        msg_from_server = Msg_From_Server(sock_fd); // listen to server messages already have been sent by server
 
         if(msg_from_server == NULL)
             break;
         printf("%s\n",msg_from_server );
         free(msg_from_server);
     }
-    shutdown(sock_fd, SHUT_RD);
-   	close(sock_fd);
+    shutdown(sock_fd, SHUT_RD); // stop listening
+   	close(sock_fd); // free the resources 
    	printf("closed socket gracefully\n");
 }
 
@@ -43,7 +43,7 @@ void close_socket_due_to_internal_error(int sock_fd){
 // helper function to receive msg from server
 char* Msg_From_Server(int sock_fd) {
     int num_pkts_currently_received = 0;
-    int n = read(sock_fd, &num_pkts_currently_received, sizeof(int));
+    int n = read(sock_fd, &num_pkts_currently_received, sizeof(int)); // read from socket as 512 sized packets 
     if(n <= 0) {
         return NULL;
     }
@@ -63,7 +63,7 @@ char* Msg_From_Server(int sock_fd) {
 // helper function for sending msg to server
 void Msg_To_Server(int sock_fd,char* str_to_send){
 	if(str_to_send == NULL) return;
-	int num_pkts_to_send_currently = 0;
+	int num_pkts_to_send_currently = 0;  // fragment the messages into 512 size packets 
 	num_pkts_to_send_currently = (int)(strlen(str_to_send) - 1)/OUTPUT_MSG_SIZE + 1;
 	int n = write(sock_fd, &num_pkts_to_send_currently, sizeof(int));
 	char * msg_to_send = (char*)malloc(num_pkts_to_send_currently * OUTPUT_MSG_SIZE);
@@ -79,7 +79,7 @@ int main(int argc,char** argv){
 
 	int sock_fd,port_no;
 	struct sockaddr_in serv_addr;
-	if(argc < 3){
+	if(argc < 3){                                    // checking wheather 3 arguments have passed or not 
 		printf("Input the server ip address and port no \n");
 		return -1;
 	}	  
